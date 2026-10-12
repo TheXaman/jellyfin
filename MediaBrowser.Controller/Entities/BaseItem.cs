@@ -1871,6 +1871,11 @@ namespace MediaBrowser.Controller.Entities
                 return false;
             }
 
+            if (!IsVisibleViaLanguages(user))
+            {
+                return false;
+            }
+
             var maxAllowedRating = user.MaxParentalRatingScore;
             var maxAllowedSubRating = user.MaxParentalRatingSubScore;
             var rating = CustomRatingForComparison;
@@ -1995,6 +2000,51 @@ namespace MediaBrowser.Controller.Entities
             }
 
             return true;
+        }
+
+        protected bool IsVisibleViaLanguages(User user)
+        {
+            var allowedLanguages = user.GetPreference(PreferenceKind.AllowedLanguages)
+                .Where(l => !string.IsNullOrWhiteSpace(l))
+                .Select(l => l.GetCleanValue())
+                .ToHashSet(StringComparer.Ordinal);
+
+            if (allowedLanguages.Count == 0 || GetBaseItemKind() is not (BaseItemKind.Movie or BaseItemKind.Episode))
+            {
+                return true;
+            }
+
+            // The stored (and picker) codes may be ISO 639-2/B ("ger"), but loaded streams carry the ISO 639-2/T code ("deu").
+            foreach (var language in allowedLanguages.ToArray())
+            {
+                if (LocalizationManager.TryGetISO6392TFromB(language, out var isoT))
+                {
+                    allowedLanguages.Add(isoT.GetCleanValue());
+                }
+            }
+
+            var allowUndetermined = allowedLanguages.Contains("und");
+
+            // The primary and its alternate versions are judged together
+            foreach (var (item, _) in GetAllItemsForMediaSources())
+            {
+                foreach (var stream in item.GetMediaStreams())
+                {
+                    if (stream.Type != MediaStreamType.Audio)
+                    {
+                        continue;
+                    }
+
+                    if (string.IsNullOrEmpty(stream.Language)
+                        ? allowUndetermined
+                        : allowedLanguages.Contains(stream.Language.GetCleanValue()))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
         }
 
         public virtual UnratedItem GetBlockUnratedType()

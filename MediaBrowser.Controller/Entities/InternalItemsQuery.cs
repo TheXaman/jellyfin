@@ -32,6 +32,7 @@ namespace MediaBrowser.Controller.Entities
             ExcludeArtistIds = [];
             ExcludeInheritedTags = [];
             IncludeInheritedTags = [];
+            IncludeAudioLanguages = [];
             ExcludeItemIds = [];
             ExcludeItemTypes = [];
             ExcludeTags = [];
@@ -202,6 +203,12 @@ namespace MediaBrowser.Controller.Entities
         public string[] ExcludeInheritedTags { get; set; }
 
         public string[] IncludeInheritedTags { get; set; }
+
+        /// <summary>
+        /// Gets or sets the audio languages the user is restricted to (parental control).
+        /// Unlike <see cref="AudioLanguages"/>, this is not a per-request filter.
+        /// </summary>
+        public string[] IncludeAudioLanguages { get; set; }
 
         public IReadOnlyList<string> Genres { get; set; }
 
@@ -543,6 +550,10 @@ namespace MediaBrowser.Controller.Entities
             IncludeInheritedTags = user.GetPreference(PreferenceKind.AllowedTags)
                 .Where(tag => !string.IsNullOrWhiteSpace(tag))
                 .Select(tag => tag.RemoveDiacritics().ToLowerInvariant())
+                .ToArray();
+
+            IncludeAudioLanguages = user.GetPreference(PreferenceKind.AllowedLanguages)
+                .Where(language => !string.IsNullOrWhiteSpace(language))
                 .ToArray();
 
             UserHasContentRestrictions = user.HasContentRestrictions();

@@ -1164,6 +1164,31 @@ public sealed partial class BaseItemRepository
                 || (isPlaylistOnlyQuery && e.Data!.Contains($"OwnerUserId\":\"{filter.User!.Id:N}\"")));
         }
 
+        // Apply included audio languages filtering (allowed languages - item must have at least one matching audio track).
+        if (filter.IncludeAudioLanguages.Length > 0)
+        {
+            var allowedLanguages = filter.IncludeAudioLanguages.Select(e => e.GetCleanValue()).ToArray();
+            var itemTypeNames = new[] { BaseItemKind.Movie, BaseItemKind.Episode }
+                .Select(e => _itemTypeLookup.BaseItemKindNames[e])
+                .ToArray();
+            var folderTypeNames = new[] { BaseItemKind.Series, BaseItemKind.Season }
+                .Select(e => _itemTypeLookup.BaseItemKindNames[e])
+                .ToArray();
+
+            var criteria = new HasMediaStreamType(MediaStreamTypeEntity.Audio, allowedLanguages);
+            var versionsWithAllowedAudio = DescendantQueryHelper.GetPrimaryVersionIdsMatching(context, criteria);
+            var foldersWithAllowedAudio = DescendantQueryHelper.GetFolderIdsMatching(context, criteria);
+
+            // Only video items and their series/season folders are restricted: other types and the library folders stay visible.
+            baseQuery = baseQuery.Where(e =>
+                (!itemTypeNames.Contains(e.Type) && !folderTypeNames.Contains(e.Type))
+                || (itemTypeNames.Contains(e.Type)
+                    && (e.MediaStreams!.Any(f => f.StreamType == MediaStreamTypeEntity.Audio
+                            && (allowedLanguages.Contains(f.Language) || (allowedLanguages.Contains("und") && string.IsNullOrEmpty(f.Language))))
+                        || versionsWithAllowedAudio.Contains(e.Id)))
+                || (folderTypeNames.Contains(e.Type) && foldersWithAllowedAudio.Contains(e.Id)));
+        }
+
         if (filter.SeriesStatuses.Length > 0)
         {
             var seriesStatus = filter.SeriesStatuses.Select(e => e.ToString()).ToArray();

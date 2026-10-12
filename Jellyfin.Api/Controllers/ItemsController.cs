@@ -280,6 +280,13 @@ public class ItemsController : BaseJellyfinApiController
             fields = [.. fields, ItemFields.Tags];
         }
 
+        if (user is not null
+            && user.GetPreference(PreferenceKind.AllowedLanguages).Length != 0
+            && !fields.Contains(ItemFields.MediaStreams))
+        {
+            fields = [.. fields, ItemFields.MediaStreams];
+        }
+
         var dtoOptions = new DtoOptions { Fields = fields }
             .AddAdditionalDtoOptions(enableImages, enableUserData, imageTypeLimit, enableImageTypes);
 

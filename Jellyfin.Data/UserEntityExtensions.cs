@@ -176,6 +176,7 @@ public static class UserEntityExtensions
             || entity.MaxParentalRatingScore.HasValue
             || entity.GetPreference(PreferenceKind.BlockedTags).Length > 0
             || entity.GetPreference(PreferenceKind.AllowedTags).Length > 0
+            || entity.GetPreference(PreferenceKind.AllowedLanguages).Length > 0
             || entity.GetPreference(PreferenceKind.BlockUnratedItems).Length > 0;
     }
 

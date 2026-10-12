@@ -41,6 +41,7 @@ namespace MediaBrowser.Model.Users
 
             BlockedTags = Array.Empty<string>();
             AllowedTags = Array.Empty<string>();
+            AllowedLanguages = Array.Empty<string>();
             BlockUnratedItems = Array.Empty<UnratedItem>();
 
             EnableUserPreferenceAccess = true;
@@ -116,6 +117,8 @@ namespace MediaBrowser.Model.Users
         public string[] BlockedTags { get; set; }
 
         public string[] AllowedTags { get; set; }
+
+        public string[] AllowedLanguages { get; set; }
 
         public bool EnableUserPreferenceAccess { get; set; }
 

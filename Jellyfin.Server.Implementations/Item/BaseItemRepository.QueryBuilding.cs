@@ -11,6 +11,7 @@ using Jellyfin.Data.Enums;
 using Jellyfin.Database.Implementations;
 using Jellyfin.Database.Implementations.Entities;
 using Jellyfin.Database.Implementations.Enums;
+using Jellyfin.Database.Implementations.MatchCriteria;
 using Jellyfin.Extensions;
 using Jellyfin.Server.Implementations.Extensions;
 using MediaBrowser.Controller.Entities;
@@ -441,12 +442,13 @@ public sealed partial class BaseItemRepository
     }
 
     /// <summary>
-    /// Checks whether the user restricts access to items by parental rating or tags.
+    /// Checks whether the user restricts access to items by parental rating, tags or audio languages.
     /// </summary>
     /// <param name="filter">The query filter.</param>
     /// <returns><c>true</c> if the query carries parental restrictions.</returns>
     private static bool RequiresParentalRestrictions(InternalItemsQuery filter)
         => filter.IncludeInheritedTags.Length > 0
+            || filter.IncludeAudioLanguages.Length > 0
             || filter.ExcludeInheritedTags.Length > 0
             || filter.MaxParentalRating is not null
             || filter.BlockUnratedItems.Length > 0;
@@ -640,6 +642,31 @@ public sealed partial class BaseItemRepository
 
                 // People don't carry the tags of the media they appear in and would never match
                 || e.Type == personTypeName);
+        }
+
+        // Apply included audio languages filtering (allowed languages - item must have at least one matching audio track).
+        if (filter.IncludeAudioLanguages.Length > 0)
+        {
+            var allowedLanguages = filter.IncludeAudioLanguages.Select(e => e.GetCleanValue()).ToArray();
+            var itemTypeNames = new[] { BaseItemKind.Movie, BaseItemKind.Episode }
+                .Select(e => _itemTypeLookup.BaseItemKindNames[e])
+                .ToArray();
+            var folderTypeNames = new[] { BaseItemKind.Series, BaseItemKind.Season }
+                .Select(e => _itemTypeLookup.BaseItemKindNames[e])
+                .ToArray();
+
+            var criteria = new HasMediaStreamType(MediaStreamTypeEntity.Audio, allowedLanguages);
+            var versionsWithAllowedAudio = DescendantQueryHelper.GetPrimaryVersionIdsMatching(context, criteria);
+            var foldersWithAllowedAudio = DescendantQueryHelper.GetFolderIdsMatching(context, criteria);
+
+            // Only video items and their series/season folders are restricted: other types and the library folders stay visible.
+            baseQuery = baseQuery.Where(e =>
+                (!itemTypeNames.Contains(e.Type) && !folderTypeNames.Contains(e.Type))
+                || (itemTypeNames.Contains(e.Type)
+                    && (e.MediaStreams!.Any(f => f.StreamType == MediaStreamTypeEntity.Audio
+                            && (allowedLanguages.Contains(f.Language) || (allowedLanguages.Contains("und") && string.IsNullOrEmpty(f.Language))))
+                        || versionsWithAllowedAudio.Contains(e.Id)))
+                || (folderTypeNames.Contains(e.Type) && foldersWithAllowedAudio.Contains(e.Id)));
         }
 
         return baseQuery;

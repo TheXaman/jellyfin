@@ -520,6 +520,7 @@ namespace Jellyfin.Server.Implementations.Users
                     AccessSchedules = user.AccessSchedules.ToArray(),
                     BlockedTags = user.GetPreference(PreferenceKind.BlockedTags),
                     AllowedTags = user.GetPreference(PreferenceKind.AllowedTags),
+                    AllowedLanguages = user.GetPreference(PreferenceKind.AllowedLanguages),
                     EnabledChannels = user.GetPreferenceValues<Guid>(PreferenceKind.EnabledChannels),
                     EnabledDevices = user.GetPreference(PreferenceKind.EnabledDevices),
                     EnabledFolders = user.GetPreferenceValues<Guid>(PreferenceKind.EnabledFolders),
@@ -912,6 +913,7 @@ namespace Jellyfin.Server.Implementations.Users
                     user.SetPreference(PreferenceKind.BlockUnratedItems, policy.BlockUnratedItems ?? Array.Empty<UnratedItem>());
                     user.SetPreference(PreferenceKind.BlockedTags, policy.BlockedTags);
                     user.SetPreference(PreferenceKind.AllowedTags, policy.AllowedTags);
+                    user.SetPreference(PreferenceKind.AllowedLanguages, policy.AllowedLanguages);
                     user.SetPreference(PreferenceKind.EnabledChannels, policy.EnabledChannels);
                     user.SetPreference(PreferenceKind.EnabledDevices, policy.EnabledDevices);
                     user.SetPreference(PreferenceKind.EnabledFolders, policy.EnabledFolders);
