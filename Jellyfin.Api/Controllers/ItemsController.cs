@@ -281,7 +281,8 @@ public class ItemsController : BaseJellyfinApiController
         }
 
         if (user is not null
-            && user.GetPreference(PreferenceKind.AllowedLanguages).Length != 0
+            && (user.GetPreference(PreferenceKind.AllowedAudioLanguages).Length != 0
+                || user.GetPreference(PreferenceKind.AllowedSubtitleLanguages).Length != 0)
             && !fields.Contains(ItemFields.MediaStreams))
         {
             fields = [.. fields, ItemFields.MediaStreams];

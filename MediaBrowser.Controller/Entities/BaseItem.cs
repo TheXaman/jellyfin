@@ -2004,42 +2004,68 @@ namespace MediaBrowser.Controller.Entities
 
         protected bool IsVisibleViaLanguages(User user)
         {
-            var allowedLanguages = user.GetPreference(PreferenceKind.AllowedLanguages)
+            var allowedAudioLanguages = user.GetPreference(PreferenceKind.AllowedAudioLanguages)
                 .Where(l => !string.IsNullOrWhiteSpace(l))
                 .Select(l => l.GetCleanValue())
                 .ToHashSet(StringComparer.Ordinal);
 
-            if (allowedLanguages.Count == 0 || GetBaseItemKind() is not (BaseItemKind.Movie or BaseItemKind.Episode))
+            var allowedSubtitleLanguages = user.GetPreference(PreferenceKind.AllowedSubtitleLanguages)
+                .Where(l => !string.IsNullOrWhiteSpace(l))
+                .Select(l => l.GetCleanValue())
+                .ToHashSet(StringComparer.Ordinal);
+
+            if (allowedAudioLanguages.Count == 0 && allowedSubtitleLanguages.Count == 0)
+            {
+                return true;
+            }
+
+            if (GetBaseItemKind() is not (BaseItemKind.Movie or BaseItemKind.Episode))
             {
                 return true;
             }
 
             // The stored (and picker) codes may be ISO 639-2/B ("ger"), but loaded streams carry the ISO 639-2/T code ("deu").
-            foreach (var language in allowedLanguages.ToArray())
+            foreach (var language in allowedAudioLanguages.ToArray())
             {
                 if (LocalizationManager.TryGetISO6392TFromB(language, out var isoT))
                 {
-                    allowedLanguages.Add(isoT.GetCleanValue());
+                    allowedAudioLanguages.Add(isoT.GetCleanValue());
                 }
             }
 
-            var allowUndetermined = allowedLanguages.Contains("und");
+            foreach (var language in allowedSubtitleLanguages.ToArray())
+            {
+                if (LocalizationManager.TryGetISO6392TFromB(language, out var isoT))
+                {
+                    allowedSubtitleLanguages.Add(isoT.GetCleanValue());
+                }
+            }
+
+            var allowAudioUndetermined = allowedAudioLanguages.Contains("und");
+            var allowSubtitleUndetermined = allowedSubtitleLanguages.Contains("und");
 
             // The primary and its alternate versions are judged together
             foreach (var (item, _) in GetAllItemsForMediaSources())
             {
                 foreach (var stream in item.GetMediaStreams())
                 {
-                    if (stream.Type != MediaStreamType.Audio)
+                    if (stream.Type == MediaStreamType.Audio && allowedAudioLanguages.Count > 0)
                     {
-                        continue;
+                        if (string.IsNullOrEmpty(stream.Language)
+                            ? allowAudioUndetermined
+                            : allowedAudioLanguages.Contains(stream.Language.GetCleanValue()))
+                        {
+                            return true;
+                        }
                     }
-
-                    if (string.IsNullOrEmpty(stream.Language)
-                        ? allowUndetermined
-                        : allowedLanguages.Contains(stream.Language.GetCleanValue()))
+                    else if (stream.Type == MediaStreamType.Subtitle && allowedSubtitleLanguages.Count > 0)
                     {
-                        return true;
+                        if (string.IsNullOrEmpty(stream.Language)
+                            ? allowSubtitleUndetermined
+                            : allowedSubtitleLanguages.Contains(stream.Language.GetCleanValue()))
+                        {
+                            return true;
+                        }
                     }
                 }
             }

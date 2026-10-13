@@ -33,6 +33,7 @@ namespace MediaBrowser.Controller.Entities
             ExcludeInheritedTags = [];
             IncludeInheritedTags = [];
             IncludeAudioLanguages = [];
+            IncludeSubtitleLanguages = [];
             ExcludeItemIds = [];
             ExcludeItemTypes = [];
             ExcludeTags = [];
@@ -209,6 +210,12 @@ namespace MediaBrowser.Controller.Entities
         /// Unlike <see cref="AudioLanguages"/>, this is not a per-request filter.
         /// </summary>
         public string[] IncludeAudioLanguages { get; set; }
+
+        /// <summary>
+        /// Gets or sets the subtitle languages the user is restricted to (parental control).
+        /// Unlike <see cref="SubtitleLanguages"/>, this is not a per-request filter.
+        /// </summary>
+        public string[] IncludeSubtitleLanguages { get; set; }
 
         public IReadOnlyList<string> Genres { get; set; }
 
@@ -552,7 +559,11 @@ namespace MediaBrowser.Controller.Entities
                 .Select(tag => tag.RemoveDiacritics().ToLowerInvariant())
                 .ToArray();
 
-            IncludeAudioLanguages = user.GetPreference(PreferenceKind.AllowedLanguages)
+            IncludeAudioLanguages = user.GetPreference(PreferenceKind.AllowedAudioLanguages)
+                .Where(language => !string.IsNullOrWhiteSpace(language))
+                .ToArray();
+
+            IncludeSubtitleLanguages = user.GetPreference(PreferenceKind.AllowedSubtitleLanguages)
                 .Where(language => !string.IsNullOrWhiteSpace(language))
                 .ToArray();
 

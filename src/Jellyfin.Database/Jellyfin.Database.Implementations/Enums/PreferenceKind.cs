@@ -73,5 +73,10 @@ public enum PreferenceKind
     /// <summary>
     /// A list of allowed audio languages.
     /// </summary>
-    AllowedLanguages = 13
+    AllowedAudioLanguages = 13,
+
+    /// <summary>
+    /// A list of allowed subtitle languages.
+    /// </summary>
+    AllowedSubtitleLanguages = 14
 }

@@ -442,13 +442,14 @@ public sealed partial class BaseItemRepository
     }
 
     /// <summary>
-    /// Checks whether the user restricts access to items by parental rating, tags or audio languages.
+    /// Checks whether the user restricts access to items by parental rating, tags or audio/subtitle languages.
     /// </summary>
     /// <param name="filter">The query filter.</param>
     /// <returns><c>true</c> if the query carries parental restrictions.</returns>
     private static bool RequiresParentalRestrictions(InternalItemsQuery filter)
         => filter.IncludeInheritedTags.Length > 0
             || filter.IncludeAudioLanguages.Length > 0
+            || filter.IncludeSubtitleLanguages.Length > 0
             || filter.ExcludeInheritedTags.Length > 0
             || filter.MaxParentalRating is not null
             || filter.BlockUnratedItems.Length > 0;
@@ -644,10 +645,12 @@ public sealed partial class BaseItemRepository
                 || e.Type == personTypeName);
         }
 
-        // Apply included audio languages filtering (allowed languages - item must have at least one matching audio track).
-        if (filter.IncludeAudioLanguages.Length > 0)
+        // Apply included audio and subtitle languages filtering.
+        // Item must have at least one matching audio OR subtitle track (OR logic when both are set).
+        if (filter.IncludeAudioLanguages.Length > 0 || filter.IncludeSubtitleLanguages.Length > 0)
         {
-            var allowedLanguages = filter.IncludeAudioLanguages.Select(e => e.GetCleanValue()).ToArray();
+            var allowedAudioLanguages = filter.IncludeAudioLanguages.Select(e => e.GetCleanValue()).ToArray();
+            var allowedSubtitleLanguages = filter.IncludeSubtitleLanguages.Select(e => e.GetCleanValue()).ToArray();
             var itemTypeNames = new[] { BaseItemKind.Movie, BaseItemKind.Episode }
                 .Select(e => _itemTypeLookup.BaseItemKindNames[e])
                 .ToArray();
@@ -655,18 +658,32 @@ public sealed partial class BaseItemRepository
                 .Select(e => _itemTypeLookup.BaseItemKindNames[e])
                 .ToArray();
 
-            var criteria = new HasMediaStreamType(MediaStreamTypeEntity.Audio, allowedLanguages);
-            var versionsWithAllowedAudio = DescendantQueryHelper.GetPrimaryVersionIdsMatching(context, criteria);
-            var foldersWithAllowedAudio = DescendantQueryHelper.GetFolderIdsMatching(context, criteria);
+            var versionsWithAllowedAudio = allowedAudioLanguages.Length > 0
+                ? DescendantQueryHelper.GetPrimaryVersionIdsMatching(context, new HasMediaStreamType(MediaStreamTypeEntity.Audio, allowedAudioLanguages)).ToHashSet()
+                : new HashSet<Guid>();
+            var foldersWithAllowedAudio = allowedAudioLanguages.Length > 0
+                ? DescendantQueryHelper.GetFolderIdsMatching(context, new HasMediaStreamType(MediaStreamTypeEntity.Audio, allowedAudioLanguages)).ToHashSet()
+                : new HashSet<Guid>();
+
+            var versionsWithAllowedSubtitle = allowedSubtitleLanguages.Length > 0
+                ? DescendantQueryHelper.GetPrimaryVersionIdsMatching(context, new HasMediaStreamType(MediaStreamTypeEntity.Subtitle, allowedSubtitleLanguages)).ToHashSet()
+                : new HashSet<Guid>();
+            var foldersWithAllowedSubtitle = allowedSubtitleLanguages.Length > 0
+                ? DescendantQueryHelper.GetFolderIdsMatching(context, new HasMediaStreamType(MediaStreamTypeEntity.Subtitle, allowedSubtitleLanguages)).ToHashSet()
+                : new HashSet<Guid>();
 
             // Only video items and their series/season folders are restricted: other types and the library folders stay visible.
             baseQuery = baseQuery.Where(e =>
                 (!itemTypeNames.Contains(e.Type) && !folderTypeNames.Contains(e.Type))
                 || (itemTypeNames.Contains(e.Type)
-                    && (e.MediaStreams!.Any(f => f.StreamType == MediaStreamTypeEntity.Audio
-                            && (allowedLanguages.Contains(f.Language) || (allowedLanguages.Contains("und") && string.IsNullOrEmpty(f.Language))))
+                    && ((allowedAudioLanguages.Length > 0 && (e.MediaStreams!.Any(f => f.StreamType == MediaStreamTypeEntity.Audio
+                            && (allowedAudioLanguages.Contains(f.Language) || (allowedAudioLanguages.Contains("und") && string.IsNullOrEmpty(f.Language))))
                         || versionsWithAllowedAudio.Contains(e.Id)))
-                || (folderTypeNames.Contains(e.Type) && foldersWithAllowedAudio.Contains(e.Id)));
+                    || (allowedSubtitleLanguages.Length > 0 && (e.MediaStreams!.Any(f => f.StreamType == MediaStreamTypeEntity.Subtitle
+                            && (allowedSubtitleLanguages.Contains(f.Language) || (allowedSubtitleLanguages.Contains("und") && string.IsNullOrEmpty(f.Language))))
+                        || versionsWithAllowedSubtitle.Contains(e.Id)))))
+                || (folderTypeNames.Contains(e.Type) && ((allowedAudioLanguages.Length > 0 && foldersWithAllowedAudio.Contains(e.Id))
+                    || (allowedSubtitleLanguages.Length > 0 && foldersWithAllowedSubtitle.Contains(e.Id)))));
         }
 
         return baseQuery;
